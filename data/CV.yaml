@@ -1,0 +1,41 @@
+# CV/Profile Data for ryOS
+# This file is used for dynamic OS branding and personalization
+# Compatible with XPortfolio CV.yaml format
+
+cv:
+  name: Ahmad Jalil
+  location: Prince George, BC
+  email: me@ahmadjalil.com
+  phone: +1-778-267-9144
+  website: https://ahmadjalil.com
+  social:
+    - network: LinkedIn
+      username: ahmad-jalil-b00669197
+      url: https://www.linkedin.com/in/ahmad-jalil-b00669197/
+    - network: GitHub
+      username: ahzs645
+      url: https://github.com/ahzs645
+    - network: Twitter
+      username: ahmadjalil
+      url: https://x.com/ahmadjalil
+
+  sections:
+    experience:
+      - company: Northern Analytical Laboratory Services
+        position: Research Assistant
+        location: Prince George, BC
+        positions:
+          - title: Research Assistant
+            start_date: 2022-09
+            end_date: present
+            highlights:
+              - Work both independently and in a team in a laboratory environment
+              - Revamped invoicing system to automate payment tracking processes
+              - Streamlined and optimized laboratory workflow
+
+    education:
+      - institution: University of Northern British Columbia
+        degree: Bachelor of Science
+        field: Computer Science
+        start_date: 2018
+        end_date: 2022

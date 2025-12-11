@@ -452,6 +452,165 @@ ${metadataMarker}`
     ],
   });
 
+  // Step 9: Patch translation files for AI name and OS branding
+  logStep("Step 9: Patching translation files");
+
+  // Read config to get replacement values
+  const envExamplePath = path.join(TEMPLATES_DIR, "env.example");
+  let aiName = "Ahmad";
+  let osName = "ahmadOS";
+
+  if (fs.existsSync(envExamplePath)) {
+    const envContent = fs.readFileSync(envExamplePath, "utf-8");
+    const aiNameMatch = envContent.match(/VITE_AI_ASSISTANT_NAME="([^"]+)"/);
+    const osNameMatch = envContent.match(/VITE_OS_NAME="([^"]+)"/);
+    if (aiNameMatch) aiName = aiNameMatch[1];
+    if (osNameMatch) osName = osNameMatch[1];
+  }
+
+  const localesDir = path.join(ROOT, "src/lib/locales");
+  if (fs.existsSync(localesDir)) {
+    const languages = fs.readdirSync(localesDir).filter(f =>
+      fs.statSync(path.join(localesDir, f)).isDirectory()
+    );
+
+    for (const lang of languages) {
+      const translationPath = path.join(localesDir, lang, "translation.json");
+      if (!fs.existsSync(translationPath)) continue;
+
+      let content = fs.readFileSync(translationPath, "utf-8");
+      let modified = false;
+
+      // Replace AI assistant name references
+      // Be careful to preserve case and context
+      const replacements = [
+        // Chat with Ryo -> Chat with Ahmad
+        [/"Chat with Ryo"/g, `"Chat with ${aiName}"`],
+        [/"chat with Ryo"/g, `"chat with ${aiName}"`],
+        // Ryo will respond -> Ahmad will respond
+        [/"Ryo will respond/g, `"${aiName} will respond`],
+        // i'm ryo -> i'm ahmad
+        [/i'm ryo\./g, `i'm ${aiName.toLowerCase()}.`],
+        // @ryo -> @ahmad (but keep as a handle)
+        [/"@ryo"/g, `"@${aiName.toLowerCase()}"`],
+        // "ryo": "Ryo" -> "ryo": "Ahmad" (the display name)
+        [/"ryo": "Ryo"/g, `"ryo": "${aiName}"`],
+        // greeting with ryo
+        [/hey! i'm ryo\./g, `hey! i'm ${aiName.toLowerCase()}.`],
+        // Login to ryOS -> Login to ahmadOS
+        [/"Login to ryOS"/g, `"Login to ${osName}"`],
+        [/"loginToRyOS": "Login to ryOS"/g, `"loginToRyOS": "Login to ${osName}"`],
+        // ryOS Account -> ahmadOS Account (keep key, change value)
+        [/"ryOSAccount": "ryOS Account"/g, `"ryOSAccount": "${osName} Account"`],
+        // ryOS Login -> ahmadOS Login
+        [/"dialogTitle": "ryOS Login"/g, `"dialogTitle": "${osName} Login"`],
+        // ryOS Code Preview
+        [/"ryOS Code Preview"/g, `"${osName} Code Preview"`],
+        // Chat with Ryo descriptions
+        [/chat with Ryo/g, `chat with ${aiName}`],
+        [/chatting with Ryo/g, `chatting with ${aiName}`],
+        // Ask Ryo to
+        [/Ask Ryo to/g, `Ask ${aiName} to`],
+        // Mention @ryo for AI
+        [/Mention @ryo for/g, `Mention @${aiName.toLowerCase()} for`],
+        // Ryo becomes a DJ
+        [/Ryo becomes a DJ/g, `${aiName} becomes a DJ`],
+        // let Ryo AI
+        [/let Ryo AI/g, `let ${aiName} AI`],
+        // AI chat mode with ryo
+        [/chat mode with ryo/g, `chat mode with ${aiName.toLowerCase()}`],
+        // Chat with ryo
+        [/Chat with ryo/g, `Chat with ${aiName.toLowerCase()}`],
+      ];
+
+      for (const [search, replace] of replacements) {
+        if (search instanceof RegExp && search.test(content)) {
+          content = content.replace(search, replace as string);
+          modified = true;
+        }
+      }
+
+      if (modified) {
+        fs.writeFileSync(translationPath, content);
+        logSuccess(`Patched translations for ${lang}`);
+      }
+    }
+  } else {
+    logWarning("Locales directory not found");
+  }
+
+  // Step 10: Patch ChatsAppComponent for @ryo -> @yourname
+  logStep("Step 10: Patching ChatsAppComponent");
+
+  const chatsAppPath = path.join(ROOT, "src/apps/chats/components/ChatsAppComponent.tsx");
+  if (fs.existsSync(chatsAppPath)) {
+    let content = fs.readFileSync(chatsAppPath, "utf-8");
+    let modified = false;
+
+    // Replace hardcoded "Ryo" username in messages
+    if (content.includes('username: msg.role === "user" ? username || "You" : "Ryo"')) {
+      // Add config import if not present
+      if (!content.includes('from "@/lib/config"')) {
+        content = content.replace(
+          'import { useTranslation }',
+          `import { getAIConfig } from "@/lib/config";\nimport { useTranslation }`
+        );
+      }
+      // Replace the hardcoded Ryo with config
+      content = content.replace(
+        'username: msg.role === "user" ? username || "You" : "Ryo"',
+        'username: msg.role === "user" ? username || "You" : getAIConfig().name'
+      );
+      modified = true;
+      logSuccess("Replaced hardcoded AI name in ChatsAppComponent");
+    }
+
+    if (modified) {
+      fs.writeFileSync(chatsAppPath, content);
+    }
+  }
+
+  // Step 11: Patch ControlPanelsAppComponent
+  logStep("Step 11: Patching ControlPanelsAppComponent");
+
+  const controlPanelsPath = path.join(ROOT, "src/apps/control-panels/components/ControlPanelsAppComponent.tsx");
+  if (fs.existsSync(controlPanelsPath)) {
+    let content = fs.readFileSync(controlPanelsPath, "utf-8");
+    let modified = false;
+
+    // Replace hardcoded ryOS with config
+    if (content.includes('ryOS {displayVersion}') && !content.includes('getOSConfig()')) {
+      // Add config import
+      if (!content.includes('from "@/lib/config"')) {
+        content = content.replace(
+          'import { useTranslation }',
+          `import { getOSConfig } from "@/lib/config";\nimport { useTranslation }`
+        );
+      }
+      // Replace ryOS display
+      content = content.replace(
+        'ryOS {displayVersion}{displayBuild}',
+        '{getOSConfig().name} {displayVersion}{displayBuild}'
+      );
+      modified = true;
+      logSuccess("Replaced hardcoded OS name in ControlPanelsAppComponent");
+    }
+
+    // Replace hardcoded GitHub download URL
+    if (content.includes('https://github.com/ryokun6/ryos/releases')) {
+      content = content.replace(
+        /https:\/\/github\.com\/ryokun6\/ryos\/releases\/download\/v\$\{desktopVersion\}\/ryOS_\$\{desktopVersion\}_aarch64\.dmg/g,
+        '${getOSConfig().githubUrl}/releases/download/v${desktopVersion}/${getOSConfig().name}_${desktopVersion}_aarch64.dmg'
+      );
+      modified = true;
+      logSuccess("Replaced hardcoded GitHub URL in ControlPanelsAppComponent");
+    }
+
+    if (modified) {
+      fs.writeFileSync(controlPanelsPath, content);
+    }
+  }
+
   // Done!
   log("\n✨ Customizations applied successfully!\n", colors.green);
   log("Next steps:", colors.blue);

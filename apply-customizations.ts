@@ -547,22 +547,32 @@ ${metadataMarker}`
     let content = fs.readFileSync(chatsAppPath, "utf-8");
     let modified = false;
 
+    // Add config import if not present
+    if (!content.includes('from "@/lib/config"')) {
+      content = content.replace(
+        'import { useTranslation }',
+        `import { getAIConfig } from "@/lib/config";\nimport { useTranslation }`
+      );
+      modified = true;
+      logSuccess("Added config import to ChatsAppComponent");
+    }
+
     // Replace hardcoded "Ryo" username in messages
     if (content.includes('username: msg.role === "user" ? username || "You" : "Ryo"')) {
-      // Add config import if not present
-      if (!content.includes('from "@/lib/config"')) {
-        content = content.replace(
-          'import { useTranslation }',
-          `import { getAIConfig } from "@/lib/config";\nimport { useTranslation }`
-        );
-      }
-      // Replace the hardcoded Ryo with config
       content = content.replace(
         'username: msg.role === "user" ? username || "You" : "Ryo"',
         'username: msg.role === "user" ? username || "You" : getAIConfig().name'
       );
       modified = true;
-      logSuccess("Replaced hardcoded AI name in ChatsAppComponent");
+      logSuccess("Replaced hardcoded AI name in message username");
+    }
+
+    // Replace "@ryo" display strings in window title (line 528)
+    // : "@ryo"  ->  : \`@\${getAIConfig().name.toLowerCase()}\`
+    if (content.includes(': "@ryo"')) {
+      content = content.replace(/: "@ryo"/g, ': `@${getAIConfig().name.toLowerCase()}`');
+      modified = true;
+      logSuccess("Replaced @ryo window title with dynamic AI name");
     }
 
     if (modified) {
@@ -570,8 +580,44 @@ ${metadataMarker}`
     }
   }
 
-  // Step 11: Patch ControlPanelsAppComponent
-  logStep("Step 11: Patching ControlPanelsAppComponent");
+  // Step 11: Patch BootScreen.tsx for dynamic OS name
+  logStep("Step 11: Patching BootScreen.tsx");
+
+  const bootScreenPath = path.join(ROOT, "src/components/dialogs/BootScreen.tsx");
+  if (fs.existsSync(bootScreenPath)) {
+    let content = fs.readFileSync(bootScreenPath, "utf-8");
+    let modified = false;
+
+    // Add config import if not present
+    if (!content.includes('from "@/lib/config"')) {
+      content = content.replace(
+        'import { useTranslation } from "react-i18next";',
+        `import { useTranslation } from "react-i18next";
+import { getOSConfig } from "@/lib/config";`
+      );
+      modified = true;
+      logSuccess("Added config import to BootScreen");
+    }
+
+    // Replace hardcoded <span className="text-blue-500">ry</span>OS with dynamic name
+    if (content.includes('<span className="text-blue-500">ry</span>OS')) {
+      content = content.replace(
+        '<span className="text-blue-500">ry</span>OS',
+        '{getOSConfig().name}'
+      );
+      modified = true;
+      logSuccess("Replaced hardcoded OS name in BootScreen");
+    } else if (content.includes('{getOSConfig().name}')) {
+      logSuccess("BootScreen already uses dynamic OS name");
+    }
+
+    if (modified) {
+      fs.writeFileSync(bootScreenPath, content);
+    }
+  }
+
+  // Step 12: Patch ControlPanelsAppComponent
+  logStep("Step 12: Patching ControlPanelsAppComponent");
 
   const controlPanelsPath = path.join(ROOT, "src/apps/control-panels/components/ControlPanelsAppComponent.tsx");
   if (fs.existsSync(controlPanelsPath)) {

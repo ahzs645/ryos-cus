@@ -195,10 +195,12 @@ async function main() {
   copyTemplate("CV.yaml", "public/data/CV.yaml");
   copyTemplate("deploy-pages.yml", ".github/workflows/deploy-pages.yml");
 
-  // Step 2: Copy CV store
-  logStep("Step 2: Copying CV store");
+  // Step 2: Copy CV store and TrafficLights component
+  logStep("Step 2: Copying CV store and UI components");
   copyTemplate("useCvStore.ts", "src/stores/useCvStore.ts");
   copyTemplate("cvParser.ts", "src/utils/cvParser.ts");
+  copyTemplate("TrafficLights.tsx", "src/components/ui/TrafficLights.tsx");
+  copyTemplate("TrafficLights.css", "src/components/ui/TrafficLights.css");
 
   // Step 3: Patch package.json
   logStep("Step 3: Patching package.json");
@@ -709,6 +711,69 @@ import { getOSConfig } from "@/lib/config";`
 
     if (modified) {
       fs.writeFileSync(appTsxPath, content);
+    }
+  }
+
+  // Step 14: Patch WindowFrame.tsx to use TrafficLights component
+  logStep("Step 14: Patching WindowFrame.tsx for TrafficLights");
+
+  const windowFramePath = path.join(ROOT, "src/components/layout/WindowFrame.tsx");
+  if (fs.existsSync(windowFramePath)) {
+    let content = fs.readFileSync(windowFramePath, "utf-8");
+    let modified = false;
+
+    // Add TrafficLights import if not present
+    if (!content.includes('import { TrafficLights }')) {
+      content = content.replace(
+        'import { ThemedIcon } from "@/components/shared/ThemedIcon";',
+        `import { ThemedIcon } from "@/components/shared/ThemedIcon";
+import { TrafficLights } from "@/components/ui/TrafficLights";`
+      );
+      modified = true;
+      logSuccess("Added TrafficLights import to WindowFrame");
+    }
+
+    // Replace the inline traffic lights with the component
+    // This is a large block replacement using regex
+    const trafficLightsInlinePattern = /\{\/\* Traffic Light Buttons \*\/\}\s*<div\s+className="flex items-center gap-2 ml-1\.5 relative"\s+data-titlebar-controls\s*>[\s\S]*?{\/\* Close Button \(Red\) \*\/\}[\s\S]*?{\/\* Minimize Button \(Yellow\) \*\/\}[\s\S]*?{\/\* Maximize Button \(Green\) \*\/\}[\s\S]*?<\/div>\s*<\/div>\s*<\/div>/;
+
+    // Check if the pattern exists (hasn't been patched yet)
+    if (content.includes('{/* Close Button (Red) */}') && content.includes('{/* Maximize Button (Green) */}')) {
+      // Use a simpler approach: find the start and end markers and replace
+      const startMarker = '{/* Traffic Light Buttons */}';
+      const endMarker = '{/* Title - removed white background */}';
+
+      const startIdx = content.indexOf(startMarker);
+      const endIdx = content.indexOf(endMarker);
+
+      if (startIdx !== -1 && endIdx !== -1 && endIdx > startIdx) {
+        const before = content.substring(0, startIdx);
+        const after = content.substring(endIdx);
+
+        const replacement = `{/* Traffic Light Buttons */}
+              <div className="ml-1.5">
+                <TrafficLights
+                  isForeground={isForeground}
+                  onClose={handleClose}
+                  onMinimize={handleMinimize}
+                  onMaximize={handleFullMaximize}
+                />
+              </div>
+
+              `;
+
+        content = before + replacement + after;
+        modified = true;
+        logSuccess("Replaced inline traffic lights with TrafficLights component");
+      } else {
+        logWarning("Could not find traffic lights markers in WindowFrame.tsx");
+      }
+    } else if (content.includes('<TrafficLights')) {
+      logSuccess("WindowFrame already uses TrafficLights component");
+    }
+
+    if (modified) {
+      fs.writeFileSync(windowFramePath, content);
     }
   }
 

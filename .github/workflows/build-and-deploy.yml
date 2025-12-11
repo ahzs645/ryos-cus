@@ -1,0 +1,107 @@
+# Build customized ryOS and deploy to GitHub Pages
+name: Build and Deploy
+
+on:
+  # Run on push to main
+  push:
+    branches: ["main"]
+  # Run daily to catch upstream updates
+  schedule:
+    - cron: "0 6 * * *"  # 6 AM UTC daily
+  # Allow manual trigger
+  workflow_dispatch:
+    inputs:
+      force_rebuild:
+        description: 'Force rebuild even if no changes'
+        required: false
+        default: 'false'
+
+# Sets permissions for GitHub Pages deployment
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+# Allow only one concurrent deployment
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout customizations repo
+        uses: actions/checkout@v4
+        with:
+          path: customizations
+
+      - name: Clone upstream ryOS
+        run: |
+          git clone --depth 1 https://github.com/ryokun6/ryos.git ryos
+          cd ryos
+          echo "Upstream commit: $(git rev-parse HEAD)"
+          echo "UPSTREAM_SHA=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Copy customization scripts to ryOS
+        run: |
+          mkdir -p ryos/scripts/customize
+          cp -r customizations/templates ryos/scripts/customize/
+          cp customizations/apply-customizations.ts ryos/scripts/customize/
+
+      - name: Install dependencies
+        working-directory: ryos
+        run: bun install
+
+      - name: Apply customizations
+        working-directory: ryos
+        run: bun run scripts/customize/apply-customizations.ts
+
+      - name: Create .env file from template
+        working-directory: ryos
+        run: |
+          if [ -f .env.example ]; then
+            cp .env.example .env
+          fi
+          # Override with GitHub secrets/vars if set
+          if [ -n "${{ vars.VITE_OS_NAME }}" ]; then
+            echo "VITE_OS_NAME=${{ vars.VITE_OS_NAME }}" >> .env
+          fi
+          if [ -n "${{ vars.VITE_OS_FIRST_NAME }}" ]; then
+            echo "VITE_OS_FIRST_NAME=${{ vars.VITE_OS_FIRST_NAME }}" >> .env
+          fi
+          if [ -n "${{ vars.VITE_CREATOR_NAME }}" ]; then
+            echo "VITE_CREATOR_NAME=${{ vars.VITE_CREATOR_NAME }}" >> .env
+          fi
+
+      - name: Build for GitHub Pages
+        working-directory: ryos
+        run: bun run build:pages
+        env:
+          VITE_STATIC_DEPLOY: "true"
+          # Set to "/" for custom domain, or "/repo-name/" for github.io
+          VITE_BASE_PATH: "/"
+
+      - name: Deploy to gh-pages branch
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./ryos/dist
+          publish_branch: gh-pages
+          commit_message: "Deploy: upstream ${{ env.UPSTREAM_SHA }} + customizations"
+          # Keep history of deployments
+          force_orphan: false
+
+      - name: Summary
+        run: |
+          echo "## Deployment Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Upstream commit:** ${{ env.UPSTREAM_SHA }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Branch:** gh-pages" >> $GITHUB_STEP_SUMMARY
+          echo "- **Status:** ✅ Deployed" >> $GITHUB_STEP_SUMMARY

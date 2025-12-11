@@ -1,94 +1,119 @@
 # ryOS Customizations
 
-Personal customization layer for [ryOS](https://github.com/ryokun6/ryos) fork.
+Personal customization layer for [ryOS](https://github.com/ryokun6/ryos).
 
-This repo contains scripts and templates to apply your custom branding on top of upstream ryOS without maintaining a diverging fork.
+**Automatic deployment:** This repo builds a customized ryOS and deploys to GitHub Pages automatically!
 
-## Quick Start
+## 🚀 How It Works
 
-```bash
-# 1. Clone your ryOS fork
-git clone https://github.com/ahzs645/ryos.git
-cd ryos
+1. **GitHub Action** runs on push (or daily schedule)
+2. **Clones upstream** ryOS (always fresh, latest version)
+3. **Applies customizations** (branding, config, etc.)
+4. **Builds** for static deployment
+5. **Deploys** to `gh-pages` branch → GitHub Pages
 
-# 2. Add upstream remote
-git remote add upstream https://github.com/ryokun6/ryos.git
+**No fork maintenance needed!** Upstream updates are automatically included.
 
-# 3. Clone this customizations repo alongside (or anywhere)
-cd ..
-git clone https://github.com/ahzs645/ryos-customizations.git
+## 🌐 GitHub Pages Setup
 
-# 4. Run the apply script from your ryOS directory
-cd ryos
-../ryos-customizations/apply.sh
+1. Go to **Settings → Pages**
+2. Source: **Deploy from a branch**
+3. Branch: **gh-pages** / **root**
+4. Save
+
+Your site will be live at: `https://ahzs645.github.io/ryos-cus/`
+
+### Custom Domain (Optional)
+
+1. Create `templates/CNAME` with your domain (e.g., `os.ahmadjalil.com`)
+2. In workflow, set `VITE_BASE_PATH: "/"`
+3. Configure DNS to point to GitHub Pages
+
+## ⚙️ Configuration
+
+### GitHub Repository Variables
+
+Set these in **Settings → Secrets and variables → Actions → Variables**:
+
+| Variable | Description | Example |
+|----------|-------------|---------|
+| `VITE_OS_NAME` | OS display name | `ahmadOS` |
+| `VITE_OS_FIRST_NAME` | First name for dynamic naming | `ahmad` |
+| `VITE_CREATOR_NAME` | Your name | `Ahmad Jalil` |
+
+### Template Files
+
+Edit files in `templates/` to customize:
+
+- **`env.example`** - Default environment variables
+- **`persona.md`** - AI assistant personality
+- **`CV.yaml`** - Your profile (name, links, etc.)
+- **`config-frontend.ts`** - Frontend config defaults
+
+## 📁 Structure
+
+```
+├── .github/workflows/
+│   └── build-and-deploy.yml  # Auto-build and deploy
+├── templates/                 # Your customization files
+│   ├── config-frontend.ts    # Frontend config
+│   ├── config-backend.ts     # Backend config
+│   ├── env.example           # Environment template
+│   ├── persona.md            # AI personality
+│   ├── CV.yaml               # Your profile data
+│   ├── aiPrompts.ts          # AI system prompts
+│   └── ...
+├── apply-customizations.ts   # Patching script
+└── apply.sh                  # Local apply script
 ```
 
-## Syncing with Upstream
+## 🔄 Manual Trigger
 
-When upstream pushes new commits:
+To rebuild manually:
+1. Go to **Actions** tab
+2. Select **Build and Deploy** workflow
+3. Click **Run workflow**
+
+## 🔧 Local Development
 
 ```bash
-cd ryos
+# Clone this repo
+git clone https://github.com/ahzs645/ryos-cus.git
+cd ryos-cus
 
-# Fetch and reset to upstream
-git fetch upstream
-git reset --hard upstream/main
+# Clone upstream ryOS next to it
+git clone https://github.com/ryokun6/ryos.git ../ryos
 
-# Re-apply customizations
-../ryos-customizations/apply.sh
+# Apply customizations locally
+cd ../ryos
+../ryos-cus/apply.sh
 
-# Commit and push
-git add -A
-git commit -m "Sync with upstream + apply customizations"
-git push origin main --force
+# Run dev server
+bun install
+bun run dev
 ```
 
-## What's Included
+## 📝 Customization Tips
 
-### Templates (`templates/`)
-- `config-frontend.ts` - Frontend config (Vite env vars)
-- `config-backend.ts` - Backend/API config
-- `env.example` - Environment variable template
-- `persona.md` - AI assistant personality
-- `CV.yaml` - Profile data for dynamic branding
-- `useCvStore.ts` - Zustand store for CV data
-- `cvParser.ts` - YAML parser for CV
-- `aiPrompts.ts` - AI system prompts with config
-- `deploy-pages.yml` - GitHub Pages deployment workflow
-
-### Scripts
-- `apply.sh` - Main apply script (shell wrapper)
-- `apply-customizations.ts` - TypeScript implementation
-- `sync-upstream.sh` - Full sync + apply in one command
-
-## Customizing
-
-1. **Edit templates** in `templates/` folder
-2. **Run apply script** to update your fork
-3. **Edit `.env`** in your fork for deployment-specific values
-
-### Key Environment Variables
-
+### Change OS Name
+Edit `templates/env.example`:
 ```env
-# OS Branding
-VITE_OS_NAME="ahmadOS"
-VITE_OS_FIRST_NAME="ahmad"
-VITE_CREATOR_NAME="Ahmad Jalil"
-
-# AI Assistant
-VITE_AI_ASSISTANT_NAME="Ahmad"
-AI_PERSONA_PATH="content/persona.md"
-
-# Feature Flags (for static deployment)
-VITE_STATIC_MODE="false"
-VITE_ENABLE_AI_CHAT="true"
+VITE_OS_NAME="yourOS"
+VITE_OS_FIRST_NAME="yourname"
+VITE_CREATOR_NAME="Your Name"
 ```
 
-## How It Works
+### Change AI Persona
+Edit `templates/persona.md` with your personality.
 
-The apply script:
+### Change Profile Data
+Edit `templates/CV.yaml` with your info (name, links, experience).
+
+## How the Script Works
+
+The `apply-customizations.ts` script:
 1. Copies config files to the right locations
 2. Patches source files to use config imports instead of hardcoded values
-3. Updates build configuration for static deployment support
+3. Updates build configuration for static deployment
 
-This approach means you never have merge conflicts with upstream - you just reset to their code and re-apply your layer.
+This means zero merge conflicts with upstream - just clone fresh and re-apply!

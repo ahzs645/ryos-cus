@@ -657,6 +657,61 @@ import { getOSConfig } from "@/lib/config";`
     }
   }
 
+  // Step 13: Patch App.tsx for desktop download toast notifications
+  logStep("Step 13: Patching App.tsx");
+
+  const appTsxPath = path.join(ROOT, "src/App.tsx");
+  if (fs.existsSync(appTsxPath)) {
+    let content = fs.readFileSync(appTsxPath, "utf-8");
+    let modified = false;
+
+    // Add config import if not present
+    if (!content.includes('from "@/lib/config"')) {
+      content = content.replace(
+        'import { Toaster } from "sonner";',
+        `import { Toaster } from "sonner";\nimport { getOSConfig } from "@/lib/config";`
+      );
+      modified = true;
+      logSuccess("Added config import to App.tsx");
+    }
+
+    // Replace toast message: "ryOS ${result.version} for Mac is available"
+    if (content.includes('toast(`ryOS ${result.version} for Mac is available`')) {
+      content = content.replace(
+        'toast(`ryOS ${result.version} for Mac is available`',
+        'toast(`${getOSConfig().name} ${result.version} for Mac is available`'
+      );
+      modified = true;
+      logSuccess("Replaced version update toast message");
+    }
+
+    // Replace toast message: "ryOS is available as a Mac app"
+    if (content.includes('toast("ryOS is available as a Mac app"')) {
+      content = content.replace(
+        'toast("ryOS is available as a Mac app"',
+        'toast(`${getOSConfig().name} is available as a Mac app`'
+      );
+      modified = true;
+      logSuccess("Replaced first-time download toast message");
+    }
+
+    // Replace GitHub download URLs in App.tsx
+    // Pattern: https://github.com/ryokun6/ryos/releases/download/v${result.version}/ryOS_${result.version}_aarch64.dmg
+    const appGithubUrlPattern = /https:\/\/github\.com\/ryokun6\/ryos\/releases\/download\/v\$\{result\.version\}\/ryOS_\$\{result\.version\}_aarch64\.dmg/g;
+    if (appGithubUrlPattern.test(content)) {
+      content = content.replace(
+        appGithubUrlPattern,
+        '${getOSConfig().githubUrl}/releases/download/v${result.version}/${getOSConfig().name}_${result.version}_aarch64.dmg'
+      );
+      modified = true;
+      logSuccess("Replaced GitHub download URLs in App.tsx");
+    }
+
+    if (modified) {
+      fs.writeFileSync(appTsxPath, content);
+    }
+  }
+
   // Done!
   log("\n✨ Customizations applied successfully!\n", colors.green);
   log("Next steps:", colors.blue);

@@ -85,8 +85,15 @@ jobs:
         run: bun run build:pages
         env:
           VITE_STATIC_DEPLOY: "true"
-          # Set to "/" for custom domain, or "/repo-name/" for github.io
+          # "/" for custom domain (mac.ahmadjalil.com)
           VITE_BASE_PATH: "/"
+
+      - name: Copy CNAME for custom domain
+        run: |
+          if [ -f customizations/templates/CNAME ]; then
+            cp customizations/templates/CNAME ryos/dist/CNAME
+            echo "Custom domain: $(cat ryos/dist/CNAME)"
+          fi
 
       - name: Deploy to gh-pages branch
         uses: peaceiris/actions-gh-pages@v4
@@ -95,7 +102,9 @@ jobs:
           publish_dir: ./ryos/dist
           publish_branch: gh-pages
           commit_message: "Deploy: upstream ${{ env.UPSTREAM_SHA }} + customizations"
-          # Keep history of deployments
+          # Keep CNAME and other files
+          keep_files: false
+          # Don't use force_orphan to preserve CNAME
           force_orphan: false
 
       - name: Summary

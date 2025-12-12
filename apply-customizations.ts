@@ -795,6 +795,39 @@ import { TrafficLights } from "@/components/ui/TrafficLights";`
     }
   }
 
+  // Step 15: Patch AppManager.tsx for desktop click to unfocus windows
+  logStep("Step 15: Patching AppManager.tsx for window focus management");
+
+  const appManagerPath = path.join(ROOT, "src/apps/base/AppManager.tsx");
+  if (fs.existsSync(appManagerPath)) {
+    let content = fs.readFileSync(appManagerPath, "utf-8");
+    let modified = false;
+
+    // Add onClick handler to Desktop component for unfocusing windows
+    const desktopPatternOld = `appStates={{ windowOrder: instanceOrder, apps: legacyAppStates }}
+      />`;
+    const desktopPatternNew = `appStates={{ windowOrder: instanceOrder, apps: legacyAppStates }}
+        onClick={() => {
+          // Clicking on desktop unfocuses all windows
+          bringInstanceToForeground("");
+        }}
+      />`;
+
+    if (content.includes(desktopPatternOld) && !content.includes('bringInstanceToForeground("")')) {
+      content = content.replace(desktopPatternOld, desktopPatternNew);
+      modified = true;
+      logSuccess("Added desktop click handler to unfocus windows");
+    } else if (content.includes('bringInstanceToForeground("")')) {
+      logSuccess("AppManager already has desktop unfocus handler");
+    } else {
+      logWarning("Could not find Desktop component pattern in AppManager.tsx");
+    }
+
+    if (modified) {
+      fs.writeFileSync(appManagerPath, content);
+    }
+  }
+
   // Done!
   log("\n✨ Customizations applied successfully!\n", colors.green);
   log("Next steps:", colors.blue);

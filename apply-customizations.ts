@@ -669,12 +669,30 @@ import { getOSConfig } from "@/lib/config";`
 
     // Add config import if not present
     if (!content.includes('from "@/lib/config"')) {
-      content = content.replace(
-        'import { Toaster } from "sonner";',
-        `import { Toaster } from "sonner";\nimport { getOSConfig } from "@/lib/config";`
-      );
-      modified = true;
-      logSuccess("Added config import to App.tsx");
+      // Try the actual import path used in App.tsx
+      if (content.includes('import { Toaster } from "./components/ui/sonner"')) {
+        content = content.replace(
+          'import { Toaster } from "./components/ui/sonner";',
+          `import { Toaster } from "./components/ui/sonner";\nimport { getOSConfig } from "@/lib/config";`
+        );
+        modified = true;
+        logSuccess("Added config import to App.tsx");
+      } else if (content.includes('import { Toaster } from "sonner"')) {
+        content = content.replace(
+          'import { Toaster } from "sonner";',
+          `import { Toaster } from "sonner";\nimport { getOSConfig } from "@/lib/config";`
+        );
+        modified = true;
+        logSuccess("Added config import to App.tsx");
+      } else {
+        // Fallback: add after any Toaster import
+        content = content.replace(
+          /^(import \{ Toaster \} from [^\n]+)$/m,
+          `$1\nimport { getOSConfig } from "@/lib/config";`
+        );
+        modified = true;
+        logSuccess("Added config import to App.tsx (fallback)");
+      }
     }
 
     // Replace toast message: "ryOS ${result.version} for Mac is available"

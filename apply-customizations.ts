@@ -751,13 +751,62 @@ import { TrafficLights } from "@/components/ui/TrafficLights";`
       logSuccess("Added TrafficLights import to WindowFrame");
     }
 
-    // Replace the inline traffic lights with the component
-    // This is a large block replacement using regex
-    const trafficLightsInlinePattern = /\{\/\* Traffic Light Buttons \*\/\}\s*<div\s+className="flex items-center gap-2 ml-1\.5 relative"\s+data-titlebar-controls\s*>[\s\S]*?{\/\* Close Button \(Red\) \*\/\}[\s\S]*?{\/\* Minimize Button \(Yellow\) \*\/\}[\s\S]*?{\/\* Maximize Button \(Green\) \*\/\}[\s\S]*?<\/div>\s*<\/div>\s*<\/div>/;
+    // Check if using the new TrafficLightButton component pattern (current upstream)
+    if (content.includes('<TrafficLightButton') && content.includes('color="red"')) {
+      // Find the traffic lights section and replace with our TrafficLights component
+      const startMarker = '{/* Traffic Light Buttons */}';
+      // Try multiple possible end markers (upstream may change the comment)
+      const endMarkers = [
+        '{/* Title - white for notitlebar, themed otherwise */}',
+        '{/* Title - removed white background */}',
+        '{/* Title */',
+      ];
 
-    // Check if the pattern exists (hasn't been patched yet)
-    if (content.includes('{/* Close Button (Red) */}') && content.includes('{/* Maximize Button (Green) */}')) {
-      // Use a simpler approach: find the start and end markers and replace
+      const startIdx = content.indexOf(startMarker);
+      let endIdx = -1;
+      let endMarker = '';
+
+      for (const marker of endMarkers) {
+        const idx = content.indexOf(marker);
+        if (idx !== -1 && idx > startIdx) {
+          endIdx = idx;
+          endMarker = marker;
+          break;
+        }
+      }
+
+      if (startIdx !== -1 && endIdx !== -1) {
+        const before = content.substring(0, startIdx);
+        const after = content.substring(endIdx);
+
+        const replacement = `{/* Traffic Light Buttons */}
+              <div className="ml-1.5">
+                <TrafficLights
+                  isForeground={isForeground}
+                  onClose={handleClose}
+                  onMinimize={handleMinimize}
+                  onMaximize={handleFullMaximize}
+                />
+              </div>
+
+              `;
+
+        content = before + replacement + after;
+
+        // Remove the TrafficLightButton import since we're replacing it
+        content = content.replace(
+          /import \{ TrafficLightButton \} from "@\/components\/shared\/TrafficLightButton";\n?/,
+          ''
+        );
+
+        modified = true;
+        logSuccess("Replaced TrafficLightButton components with TrafficLights");
+      } else {
+        logWarning("Could not find traffic lights section markers in WindowFrame.tsx");
+      }
+    }
+    // Legacy: Check for old inline traffic lights pattern (older upstream versions)
+    else if (content.includes('{/* Close Button (Red) */}') && content.includes('{/* Maximize Button (Green) */}')) {
       const startMarker = '{/* Traffic Light Buttons */}';
       const endMarker = '{/* Title - removed white background */}';
 
@@ -788,6 +837,8 @@ import { TrafficLights } from "@/components/ui/TrafficLights";`
       }
     } else if (content.includes('<TrafficLights')) {
       logSuccess("WindowFrame already uses TrafficLights component");
+    } else {
+      logWarning("Could not identify traffic lights pattern in WindowFrame.tsx");
     }
 
     if (modified) {

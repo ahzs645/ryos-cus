@@ -739,17 +739,7 @@ import { getOSConfig } from "@/lib/config";`
   if (fs.existsSync(windowFramePath)) {
     let content = fs.readFileSync(windowFramePath, "utf-8");
     let modified = false;
-
-    // Add TrafficLights import if not present
-    if (!content.includes('import { TrafficLights }')) {
-      content = content.replace(
-        'import { ThemedIcon } from "@/components/shared/ThemedIcon";',
-        `import { ThemedIcon } from "@/components/shared/ThemedIcon";
-import { TrafficLights } from "@/components/ui/TrafficLights";`
-      );
-      modified = true;
-      logSuccess("Added TrafficLights import to WindowFrame");
-    }
+    let trafficLightsReplaced = false;
 
     // Check if using the new TrafficLightButton component pattern (current upstream)
     if (content.includes('<TrafficLightButton') && content.includes('color="red"')) {
@@ -764,13 +754,11 @@ import { TrafficLights } from "@/components/ui/TrafficLights";`
 
       const startIdx = content.indexOf(startMarker);
       let endIdx = -1;
-      let endMarker = '';
 
       for (const marker of endMarkers) {
         const idx = content.indexOf(marker);
         if (idx !== -1 && idx > startIdx) {
           endIdx = idx;
-          endMarker = marker;
           break;
         }
       }
@@ -800,6 +788,7 @@ import { TrafficLights } from "@/components/ui/TrafficLights";`
         );
 
         modified = true;
+        trafficLightsReplaced = true;
         logSuccess("Replaced TrafficLightButton components with TrafficLights");
       } else {
         logWarning("Could not find traffic lights section markers in WindowFrame.tsx");
@@ -831,6 +820,7 @@ import { TrafficLights } from "@/components/ui/TrafficLights";`
 
         content = before + replacement + after;
         modified = true;
+        trafficLightsReplaced = true;
         logSuccess("Replaced inline traffic lights with TrafficLights component");
       } else {
         logWarning("Could not find traffic lights markers in WindowFrame.tsx");
@@ -839,6 +829,18 @@ import { TrafficLights } from "@/components/ui/TrafficLights";`
       logSuccess("WindowFrame already uses TrafficLights component");
     } else {
       logWarning("Could not identify traffic lights pattern in WindowFrame.tsx");
+    }
+
+    // Only add TrafficLights import if we actually replaced the traffic lights section
+    // (or if TrafficLights is already used in the file). This avoids TS6133 unused import errors.
+    if (trafficLightsReplaced && !content.includes('import { TrafficLights }')) {
+      content = content.replace(
+        'import { ThemedIcon } from "@/components/shared/ThemedIcon";',
+        `import { ThemedIcon } from "@/components/shared/ThemedIcon";
+import { TrafficLights } from "@/components/ui/TrafficLights";`
+      );
+      modified = true;
+      logSuccess("Added TrafficLights import to WindowFrame");
     }
 
     if (modified) {

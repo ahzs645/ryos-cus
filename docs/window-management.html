@@ -192,6 +192,7 @@
   <div class="nav-children" style="display: none;">
     <a href="/docs/architecture" class="nav-child ">1.1 Architecture & Build</a>
     <a href="/docs/api-architecture" class="nav-child ">1.2 API Architecture</a>
+    <a href="/docs/self-hosting-vps" class="nav-child ">1.3 Self-hosting ryOS on a VPS (without Vercel)</a>
   </div>
 </div>
 <div class="nav-group ">
@@ -221,6 +222,7 @@
     <a href="/docs/applet-store" class="nav-child ">2.17 Applet Store</a>
     <a href="/docs/stickies" class="nav-child ">2.18 Stickies</a>
     <a href="/docs/infinite-mac" class="nav-child ">2.19 Infinite Mac</a>
+    <a href="/docs/winamp" class="nav-child ">2.20 Winamp</a>
   </div>
 </div>
 <div class="nav-group expanded">
@@ -358,6 +360,9 @@
   interceptClose?: boolean;
   menuBar?: React.ReactNode;
   keepMountedWhenMinimized?: boolean;
+  onFullscreenToggle?: () =&gt; void;
+  disableTitlebarAutoHide?: boolean;
+  titleBarRightContent?: React.ReactNode;
 }</code></pre>
 <h4>Material Modes</h4>
 <table><thead><tr><th>Mode</th><th>Description</th><th>Use Case</th></tr></thead><tbody><tr><td><code>default</code></td><td>Standard opaque window background</td><td>Most apps</td></tr><tr><td><code>transparent</code></td><td>Semi-transparent background</td><td>iPod, Photo Booth</td></tr><tr><td><code>notitlebar</code></td><td>Immersive mode with floating titlebar on hover</td><td>Videos, games</td></tr></tbody></table>
@@ -386,7 +391,7 @@ interface UseWindowManagerReturn {
 <h2>Window Instance State</h2>
 <p>Each window instance maintains comprehensive state:</p>
 <pre><code>interface AppInstance {
-  instanceId: string;        // Unique identifier (e.g., "finder-1")
+  instanceId: string;        // Unique identifier (numeric string, e.g., "12")
   appId: AppId;              // App type identifier
   isOpen: boolean;           // Visibility state
   isForeground: boolean;     // Focus state
@@ -398,6 +403,12 @@ interface UseWindowManagerReturn {
   displayTitle?: string;     // Dynamic title (updated by WindowFrame)
   createdAt: number;         // For stable ordering in taskbar
   initialData?: unknown;     // App-specific data passed at launch
+  launchOrigin?: {           // Source icon rect for open-from-icon animation
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  };
 }</code></pre>
 <h2>Window Lifecycle</h2>
 <h3>State Transitions</h3>
@@ -609,7 +620,7 @@ setExposeMode: (v: boolean) =&gt; void;</code></pre>
     window.innerHeight
   );
 }, [exposeMode, instanceId, instances, windowPosition, windowSize, isMobile]);</code></pre>
-<p>Windows can be selected in expose mode by clicking on them, which brings them to foreground and exits expose mode.</p>
+<p>Windows can be selected in expose mode by clicking on them, which emits a typed <code>exposeWindowSelect</code> app event and then brings the selected instance to foreground while exiting expose mode.</p>
 <h2>Close Interception</h2>
 <p>Apps can intercept close to show confirmation dialogs:</p>
 <pre><code>// In app component
@@ -628,6 +639,7 @@ useEffect(() =&gt; {
   };
 }, [instanceId, performClose, interceptClose]);</code></pre>
 <p>Apps set <code>interceptClose={true}</code> on WindowFrame and listen for the close event to show unsaved changes dialogs.</p>
+<p>In addition, app-level crash isolation is handled outside <code>WindowFrame</code>: each rendered app instance is wrapped with <code>AppErrorBoundary</code> in <code>AppManager</code>, so a runtime crash in one window can be relaunched or quit without crashing the desktop.</p>
 <h2>Mobile Adaptations</h2>
 <table><thead><tr><th>Adaptation</th><th>Description</th></tr></thead><tbody><tr><td>Full-width windows</td><td>Windows stretch to screen width on mobile</td></tr><tr><td>Touch-sized handles</td><td>Larger resize handle hit areas</td></tr><tr><td>Swipe navigation</td><td>Horizontal swipe between apps (phone only)</td></tr><tr><td>Mobile default sizes</td><td>Per-app optimized dimensions</td></tr><tr><td>Simplified controls</td><td>Reduced window chrome on small screens</td></tr></tbody></table>
 <h2>Related Documentation</h2>

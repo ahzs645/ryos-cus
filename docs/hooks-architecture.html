@@ -192,6 +192,7 @@
   <div class="nav-children" style="display: none;">
     <a href="/docs/architecture" class="nav-child ">1.1 Architecture & Build</a>
     <a href="/docs/api-architecture" class="nav-child ">1.2 API Architecture</a>
+    <a href="/docs/self-hosting-vps" class="nav-child ">1.3 Self-hosting ryOS on a VPS (without Vercel)</a>
   </div>
 </div>
 <div class="nav-group ">
@@ -221,6 +222,7 @@
     <a href="/docs/applet-store" class="nav-child ">2.17 Applet Store</a>
     <a href="/docs/stickies" class="nav-child ">2.18 Stickies</a>
     <a href="/docs/infinite-mac" class="nav-child ">2.19 Infinite Mac</a>
+    <a href="/docs/winamp" class="nav-child ">2.20 Winamp</a>
   </div>
 </div>
 <div class="nav-group expanded">
@@ -299,7 +301,7 @@
     <main class="content">
       <article>
         <h1>Hooks Architecture</h1>
-<p>ryOS provides 33 custom hooks organized by functionality, enabling audio playback, window management, media handling, effect management, and more.</p>
+<p>ryOS provides 37 custom hooks organized by functionality, enabling audio playback, window management, media handling, background synchronization, and more.</p>
 <h2>Hook Categories Overview</h2>
 <pre class="mermaid">graph TB
     subgraph Audio["Audio Hooks"]
@@ -324,6 +326,7 @@
     subgraph Media["Media Hooks"]
         UL[useLyrics]
         USC[useSongCover]
+        UCP[useCoverPalette]
         UF[useFurigana]
         ULE[useLyricsErrorToast]
     end
@@ -338,6 +341,9 @@
         USN[useSwipeNavigation]
         UW[useWallpaper]
         UCB[useCacheBustTrigger]
+        USS[useSpotlightSearch]
+        UBN[useBackgroundChatNotifications]
+        ULS[useListenSync]
         USF[useStreamingFetch]
         UTH[useTranslatedHelpItems]
     end
@@ -444,6 +450,7 @@ const { startListening, transcript, isListening } = useAudioTranscription({
   setWindowSize: (size: WindowSize) =&gt; void;
   setWindowPosition: (pos: WindowPosition) =&gt; void;
   maximizeWindowHeight: () =&gt; void;
+  getSafeAreaBottomInset: () =&gt; number;
   snapZone: "left" | "right" | null;
   computeInsets: () =&gt; WindowInsets;
 }
@@ -609,6 +616,19 @@ const { data, progress, isLoading } = useStreamingFetch&lt;TranslationResult&gt;
 });</code></pre>
 <strong>Features:</strong>
 <ul><li>Abort controller integration</li><li>Stale request prevention</li><li>Offline detection</li><li>Progress tracking</li></ul>
+<h3>useSpotlightSearch</h3>
+<p>Spotlight query orchestration with worker-backed indexing.</p>
+<pre><code>interface SpotlightSearchState {
+  results: SpotlightResult[];
+  isSearching: boolean;
+}
+
+// Usage
+const { results, isSearching } = useSpotlightSearch(query);</code></pre>
+<strong>Features:</strong>
+<ul><li>Posts index/query messages to <code>spotlightSearch.worker.ts</code></li><li>Defers initial indexing with <code>requestIdleCallback</code> for responsiveness</li><li>Subscribes to files/music/sites/video stores and refreshes index incrementally</li><li>Ignores stale worker responses with request IDs</li></ul>
+<h3>useBackgroundChatNotifications / useListenSync</h3>
+<p>Background orchestration hooks used by the desktop shell: <ul><li><code>useBackgroundChatNotifications</code> monitors chat activity and system notifications while apps run in background.</li><li><code>useListenSync</code> keeps Listen Session playback/session state synchronized across app components.</li></ul></p>
 <h3>useCacheBustTrigger</h3>
 <p>Force refresh detection for shared state.</p>
 <pre><code>interface UseCacheBustTriggerReturn {

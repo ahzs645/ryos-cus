@@ -1,0 +1,1 @@
+import{a6 as n}from"./index-5ZtQEKUN.js";let t=null,a=null;async function r(){return t||(a||(a=n("/wallpapers/manifest.json",{cache:"no-store",timeout:15e3,retry:{maxAttempts:1,initialDelayMs:250}}).then(e=>{if(!e.ok)throw new Error(`Failed to load wallpaper manifest: ${e.status}`);return e.json()}).then(e=>t=e)),a)}export{r as l};

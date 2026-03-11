@@ -1,0 +1,115 @@
+const e="ryos-applet-auth",t=`
+<script>
+  (function () {
+    var CHANNEL = "${e}";
+    var MAX_ATTEMPTS = 10;
+    var REQUEST_INTERVAL_MS = 200;
+    var TIMEOUT_MS = 2000;
+
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    var PARENT_ORIGIN = window.location.origin;
+    var currentAuthPayload = null;
+    var authResolved = false;
+    var resolveAuth = function (payload) {};
+
+    var authReady = new Promise(function (resolve) {
+      resolveAuth = function (payload) {
+        if (authResolved) {
+          return;
+        }
+        authResolved = true;
+        currentAuthPayload = payload || null;
+        resolve(null);
+      };
+    });
+
+    var attempts = 0;
+    var requestOnce = function () {
+      try {
+        if (window.parent) {
+          window.parent.postMessage(
+            { type: CHANNEL, action: "request" },
+            PARENT_ORIGIN
+          );
+        }
+      } catch (err) {
+        console.warn("[ryOS] Applet auth request failed:", err);
+      }
+    };
+
+    requestOnce();
+    var requestTimer = setInterval(function () {
+      attempts += 1;
+      if (authResolved || attempts >= MAX_ATTEMPTS) {
+        clearInterval(requestTimer);
+        return;
+      }
+      requestOnce();
+    }, REQUEST_INTERVAL_MS);
+
+      setTimeout(function () {
+        if (!authResolved) {
+          clearInterval(requestTimer);
+          resolveAuth(null);
+        }
+      }, TIMEOUT_MS);
+
+      window.addEventListener("message", function (event) {
+        if (event.source !== window.parent) {
+          return;
+        }
+        if (event.origin !== PARENT_ORIGIN) {
+          return;
+        }
+        var data = event && event.data;
+        if (!data || data.type !== CHANNEL || data.action !== "response") {
+          return;
+        }
+        clearInterval(requestTimer);
+        if (authResolved) {
+          currentAuthPayload = data.payload || null;
+          return;
+        }
+        resolveAuth(data.payload || null);
+      });
+
+      if (window.__RYOS_APPLET_FETCH_PATCHED) {
+        return;
+      }
+
+      var originalFetch = window.fetch.bind(window);
+      window.__RYOS_APPLET_FETCH_PATCHED = true;
+
+      window.fetch = function (input, init) {
+        return authReady.then(function () {
+          var shouldAugment = function (url) {
+            try {
+              var resolved = new URL(url, document.baseURI || window.location.origin);
+              return resolved.pathname === "/api/applet-ai";
+            } catch (err) {
+              return false;
+            }
+          };
+
+          var url;
+          if (typeof input === "string" || input instanceof URL) {
+            url = input.toString();
+          } else if (input instanceof Request) {
+            url = input.url;
+          }
+
+          if (!url || !shouldAugment(url)) {
+            return originalFetch(input, init);
+          }
+
+          var augmentedInit = init ? Object.assign({}, init) : {};
+          augmentedInit.credentials = "include";
+          return originalFetch(input, augmentedInit);
+        });
+      };
+  })();
+<\/script>
+`;export{e as A,t as a};

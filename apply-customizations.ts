@@ -627,21 +627,25 @@ import { getOSConfig } from "@/lib/config";`
     let modified = false;
 
     // Replace hardcoded ryOS with config
-    if (content.includes('ryOS {displayVersion}') && !content.includes('getOSConfig()')) {
-      // Add config import
-      if (!content.includes('from "@/lib/config"')) {
-        content = content.replace(
-          'import { useTranslation }',
-          `import { getOSConfig } from "@/lib/config";\nimport { useTranslation }`
-        );
-      }
-      // Replace ryOS display
-      content = content.replace(
+    let osConfigNeeded = false;
+    if (!content.includes('getOSConfig()')) {
+      // Replace ryOS display name - try multiple patterns for upstream compatibility
+      const osNamePatterns = [
         'ryOS {displayVersion}{displayBuild}',
-        '{getOSConfig().name} {displayVersion}{displayBuild}'
-      );
-      modified = true;
-      logSuccess("Replaced hardcoded OS name in ControlPanelsAppComponent");
+        'ryOS {displayVersion}',
+      ];
+      for (const pattern of osNamePatterns) {
+        if (content.includes(pattern)) {
+          content = content.replace(
+            pattern,
+            pattern.replace('ryOS', '{getOSConfig().name}')
+          );
+          modified = true;
+          osConfigNeeded = true;
+          logSuccess("Replaced hardcoded OS name in ControlPanelsAppComponent");
+          break;
+        }
+      }
     }
 
     // Replace hardcoded GitHub download URL
@@ -651,7 +655,16 @@ import { getOSConfig } from "@/lib/config";`
         '${getOSConfig().githubUrl}/releases/download/v${desktopVersion}/${getOSConfig().name}_${desktopVersion}_aarch64.dmg'
       );
       modified = true;
+      osConfigNeeded = true;
       logSuccess("Replaced hardcoded GitHub URL in ControlPanelsAppComponent");
+    }
+
+    // Only add the import if getOSConfig is actually used
+    if (osConfigNeeded && !content.includes('from "@/lib/config"')) {
+      content = content.replace(
+        'import { useTranslation }',
+        `import { getOSConfig } from "@/lib/config";\nimport { useTranslation }`
+      );
     }
 
     if (modified) {

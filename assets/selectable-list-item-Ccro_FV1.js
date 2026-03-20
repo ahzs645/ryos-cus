@@ -1,1 +1,0 @@
-import{r as o,j as m}from"./ui-core-CxevLRjf.js";import{V as p}from"./index-CN3RpWR3.js";const c=o.forwardRef(({isSelected:e,children:t,className:r,...a},s)=>m.jsx("div",{ref:s,className:p("py-1 px-5 cursor-pointer",!e&&"hover:bg-black/5",r),"data-selected":e?"true":void 0,...a,children:t}));c.displayName="SelectableListItem";export{c as S};

@@ -195,6 +195,44 @@ async function main() {
   copyTemplate("CV.yaml", "public/data/CV.yaml");
   copyTemplate("deploy-pages.yml", ".github/workflows/deploy-pages.yml");
 
+  // Step 1b: Copy aqua.css assets for macOS X Aqua theme
+  logStep("Step 1b: Copying aqua.css theme assets");
+
+  const aquaCssDir = path.join(TEMPLATES_DIR, "aqua-css");
+  if (fs.existsSync(aquaCssDir)) {
+    // Copy scoped CSS and progress.png to public/css/aqua/
+    const cssDestDir = path.join(ROOT, "public/css/aqua");
+    fs.mkdirSync(cssDestDir, { recursive: true });
+    fs.copyFileSync(path.join(aquaCssDir, "aqua.scoped.css"), path.join(cssDestDir, "aqua.scoped.css"));
+    fs.copyFileSync(path.join(aquaCssDir, "progress.png"), path.join(cssDestDir, "progress.png"));
+    logSuccess("Copied aqua.scoped.css → public/css/aqua/");
+
+    // Copy icons to public/css/aqua/icon/
+    const iconSrcDir = path.join(aquaCssDir, "icon");
+    const iconDestDir = path.join(cssDestDir, "icon");
+    if (fs.existsSync(iconSrcDir)) {
+      fs.mkdirSync(iconDestDir, { recursive: true });
+      for (const file of fs.readdirSync(iconSrcDir)) {
+        fs.copyFileSync(path.join(iconSrcDir, file), path.join(iconDestDir, file));
+      }
+      logSuccess("Copied aqua.css icons → public/css/aqua/icon/");
+    }
+
+    // Copy fonts to public/fonts/aqua/
+    const fontsDestDir = path.join(ROOT, "public/fonts/aqua");
+    fs.mkdirSync(fontsDestDir, { recursive: true });
+    const fontFiles = ["LucidaGrande.woff", "LucidaGrandeBold.woff", "Lucida Grande-Medium.ttf", "Lucida Grande-Deml Bold.ttf"];
+    for (const font of fontFiles) {
+      const fontSrc = path.join(aquaCssDir, font);
+      if (fs.existsSync(fontSrc)) {
+        fs.copyFileSync(fontSrc, path.join(fontsDestDir, font));
+      }
+    }
+    logSuccess("Copied aqua.css fonts → public/fonts/aqua/");
+  } else {
+    logWarning("aqua-css directory not found in templates");
+  }
+
   // Step 2: Copy CV store and TrafficLights component
   logStep("Step 2: Copying CV store and UI components");
   copyTemplate("useCvStore.ts", "src/stores/useCvStore.ts");
@@ -856,6 +894,21 @@ import { TrafficLights } from "@/components/ui/TrafficLights";`
       logSuccess("Added TrafficLights import to WindowFrame");
     }
 
+    // Add "aqua" class to the .window div when theme is macosx (for aqua.css scoping)
+    if (!content.includes('"aqua"') || !content.includes('currentTheme === "macosx"')) {
+      // The window div has className={cn(isXpTheme ? "window ..." : ... )}
+      // We need to add the "aqua" class conditionally
+      const windowClassPattern = /className=\{cn\(\s*isXpTheme\s*\n?\s*\? "window flex flex-col h-full"/;
+      if (windowClassPattern.test(content)) {
+        content = content.replace(
+          windowClassPattern,
+          `className={cn(\n            currentTheme === "macosx" && "aqua",\n            isXpTheme\n              ? "window flex flex-col h-full"`
+        );
+        modified = true;
+        logSuccess("Added aqua class to window div for macOS X theme");
+      }
+    }
+
     if (modified) {
       fs.writeFileSync(windowFramePath, content);
     }
@@ -891,6 +944,213 @@ import { TrafficLights } from "@/components/ui/TrafficLights";`
 
     if (modified) {
       fs.writeFileSync(appManagerPath, content);
+    }
+  }
+
+  // Step 16: Patch useThemeStore.ts to load aqua.css for macOS X theme
+  logStep("Step 16: Patching useThemeStore.ts for aqua.css integration");
+
+  const themeStorePath = path.join(ROOT, "src/stores/useThemeStore.ts");
+  if (fs.existsSync(themeStorePath)) {
+    let content = fs.readFileSync(themeStorePath, "utf-8");
+    let modified = false;
+
+    // Add aqua.css loading logic after the ensureLegacyCss function
+    if (!content.includes("ensureAquaCss")) {
+      const aquaCssCode = `
+// Dynamically manage loading/unloading of aqua.css for macOS X Aqua theme
+let aquaCssLink: HTMLLinkElement | null = null;
+
+function ensureAquaCss(theme: OsThemeId) {
+  if (theme === "macosx") {
+    if (!aquaCssLink) {
+      const link = document.createElement("link");
+      link.rel = "stylesheet";
+      link.href = "/css/aqua/aqua.scoped.css";
+      link.dataset.role = "aqua-css";
+      document.head.appendChild(link);
+      aquaCssLink = link;
+    }
+  } else {
+    if (aquaCssLink) {
+      aquaCssLink.remove();
+      aquaCssLink = null;
+    }
+  }
+}
+`;
+
+      // Insert after ensureLegacyCss function (after its closing brace)
+      const legacyCssEnd = "async function ensureLegacyCss(theme: OsThemeId) {";
+      const legacyCssIdx = content.indexOf(legacyCssEnd);
+      if (legacyCssIdx !== -1) {
+        // Find the closing brace of ensureLegacyCss
+        let braceCount = 0;
+        let endIdx = -1;
+        for (let i = legacyCssIdx; i < content.length; i++) {
+          if (content[i] === "{") braceCount++;
+          if (content[i] === "}") {
+            braceCount--;
+            if (braceCount === 0) {
+              endIdx = i + 1;
+              break;
+            }
+          }
+        }
+        if (endIdx !== -1) {
+          content = content.slice(0, endIdx) + "\n" + aquaCssCode + content.slice(endIdx);
+          modified = true;
+          logSuccess("Added ensureAquaCss function");
+        }
+      }
+
+      // Add ensureAquaCss calls alongside ensureLegacyCss calls
+      if (modified) {
+        content = content.replace(
+          /ensureLegacyCss\(safe\);/g,
+          "ensureLegacyCss(safe);\n    ensureAquaCss(safe);"
+        );
+        content = content.replace(
+          /ensureLegacyCss\(theme\);(\n\s*\},)/,
+          "ensureLegacyCss(theme);\n    ensureAquaCss(theme);$1"
+        );
+        logSuccess("Added ensureAquaCss calls to setTheme and hydrate");
+      }
+    } else {
+      logSuccess("useThemeStore already has aqua.css integration");
+    }
+
+    if (modified) {
+      fs.writeFileSync(themeStorePath, content);
+    }
+  }
+
+  // Step 17: Add aqua CSS class hooks to components
+  logStep("Step 17: Adding aqua CSS class hooks for traffic lights, toolbar, and sliders");
+
+  // 17a: Add "traffic-lights" class to the traffic light container in WindowFrame.tsx
+  if (fs.existsSync(windowFramePath)) {
+    let content = fs.readFileSync(windowFramePath, "utf-8");
+    let modified = false;
+
+    const oldTrafficClass = 'className="group/traffic flex items-center gap-2 ml-1.5 relative"';
+    const newTrafficClass = 'className="group/traffic traffic-lights flex items-center gap-2 ml-1.5 relative"';
+    if (content.includes(oldTrafficClass)) {
+      content = content.replace(oldTrafficClass, newTrafficClass);
+      modified = true;
+      logSuccess("Added traffic-lights CSS class to traffic light container");
+    } else if (content.includes("traffic-lights")) {
+      logSuccess("Traffic lights container already has traffic-lights class");
+    }
+
+    if (modified) {
+      fs.writeFileSync(windowFramePath, content);
+    }
+  }
+
+  // 17b: Add "toolbar" class to the Finder macOS toolbar
+  const finderPath = path.join(ROOT, "src/apps/finder/components/FinderAppComponent.tsx");
+  if (fs.existsSync(finderPath)) {
+    let content = fs.readFileSync(finderPath, "utf-8");
+    let modified = false;
+
+    const oldToolbar = 'className="flex items-center justify-between py-1.5 gap-2 px-1"';
+    const newToolbar = 'className="toolbar flex items-center justify-between py-1.5 gap-2 px-1"';
+    if (content.includes(oldToolbar)) {
+      content = content.replace(oldToolbar, newToolbar);
+      modified = true;
+      logSuccess("Added toolbar CSS class to Finder toolbar");
+    } else if (content.includes('"toolbar flex items-center')) {
+      logSuccess("Finder toolbar already has toolbar class");
+    }
+
+    // Remove background: "transparent" from toolbar style so aqua CSS can apply
+    if (content.includes('style={{ background: "transparent" }}') &&
+        content.includes('toolbar flex items-center')) {
+      // Find the toolbar div and remove the transparent background style
+      const toolbarStylePattern = /className="toolbar flex items-center justify-between py-1\.5 gap-2 px-1"\s*\n\s*style=\{\{ background: "transparent" \}\}/;
+      if (toolbarStylePattern.test(content)) {
+        content = content.replace(toolbarStylePattern, 'className="toolbar flex items-center justify-between py-1.5 gap-2 px-1"');
+        modified = true;
+        logSuccess("Removed transparent background from Finder toolbar");
+      }
+    }
+
+    if (modified) {
+      fs.writeFileSync(finderPath, content);
+    }
+  }
+
+  // 17c: Add aqua Radix slider overrides and button isolation to themes.css
+  const themesCssPath = path.join(ROOT, "src/styles/themes.css");
+  if (fs.existsSync(themesCssPath)) {
+    let content = fs.readFileSync(themesCssPath, "utf-8");
+
+    if (!content.includes(".aqua .os-slider-track")) {
+      const aquaOverrides = `
+
+/* ── Aqua: Radix Slider overrides ─────────────────────────── */
+/* The aqua.css targets native input[type=range] but ryOS uses Radix <span>-based sliders */
+.aqua .os-slider-track {
+  background: linear-gradient(180deg, #b1b1b1, #d4d4d4) !important;
+  border-radius: 3.5px !important;
+  box-shadow: inset 0 2px 4px rgba(0,0,0,.6), inset 2px 0 2px rgba(0,0,0,.15) !important;
+  height: 7px !important;
+}
+.aqua .os-slider-range {
+  background: linear-gradient(180deg, #5794d8, #3a7bd5) !important;
+  border-radius: 3.5px !important;
+}
+.aqua .os-slider-thumb {
+  width: 16px !important;
+  height: 16px !important;
+  border: none !important;
+  border-radius: 50% !important;
+  background: linear-gradient(180deg,
+    hsla(0,0%,100%,.9) 0%, hsla(0,0%,100%,.6) 15%,
+    hsla(0,0%,100%,.2) 40%, hsla(0,0%,100%,.05) 50%,
+    hsla(0,0%,100%,.1) 70%, hsla(0,0%,100%,.4)),
+    linear-gradient(#0041b8, #2d73c7, #21a0c4) !important;
+  box-shadow:
+    0 2px 4px rgba(0,0,0,.5),
+    0 1px 2px rgba(0,0,0,.4),
+    inset 0 1px 2px rgba(255,255,255,.6),
+    inset 0 0 0 0.5px rgba(0,0,0,.3) !important;
+}
+.aqua .os-slider-thumb:active {
+  background: linear-gradient(180deg,
+    hsla(0,0%,100%,.9) 0%, hsla(0,0%,100%,.6) 15%,
+    hsla(0,0%,100%,.2) 40%, hsla(0,0%,100%,.05) 50%,
+    hsla(0,0%,100%,.1) 70%, hsla(0,0%,100%,.4)),
+    linear-gradient(#002d8c, #1955a5, #006ea0) !important;
+}
+
+/* ── Aqua: Prevent aqua.css generic button styles from leaking into special controls ── */
+.aqua .traffic-lights button,
+.aqua [data-titlebar-controls] button {
+  background-image: none !important;
+  background-color: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  border-radius: 0 !important;
+  padding: 0 !important;
+  min-height: auto !important;
+  min-width: auto !important;
+}
+.aqua .metal-inset-btn {
+  background-image: none !important;
+  min-height: 22px !important;
+  border-radius: 0 !important;
+}
+.aqua .metal-inset-btn-group {
+  border-radius: 4px !important;
+}`;
+
+      content += aquaOverrides;
+      fs.writeFileSync(themesCssPath, content);
+      logSuccess("Added aqua Radix slider overrides and button isolation to themes.css");
+    } else {
+      logSuccess("themes.css already has aqua slider overrides");
     }
   }
 

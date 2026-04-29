@@ -1,0 +1,1 @@
+import{r as s,j as o}from"./ui-core-jrn_Qft-.js";function l(){const[n,r]=s.useState("");return s.useEffect(()=>{const e=[".","..","...","..",".",".","..","..."];let t=0;const a=setInterval(()=>{r(e[t]),t=(t+1)%e.length},200);return()=>clearInterval(a)},[]),o.jsx("span",{children:n})}export{l as A};

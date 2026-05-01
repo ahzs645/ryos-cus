@@ -1,0 +1,1 @@
+import{ai as r}from"./index-_9v1624m.js";function e(){return typeof navigator<"u"&&"onLine"in navigator?!navigator.onLine:!1}function i(n){r.error(n||"This feature requires an internet connection",{id:"offline-error",duration:3e3})}function t(n){return e()?(i(n),!0):!1}export{t as c,e as i};

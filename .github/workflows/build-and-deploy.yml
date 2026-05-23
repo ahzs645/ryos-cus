@@ -2,13 +2,6 @@
 name: Build and Deploy
 
 on:
-  # Run on push to main
-  push:
-    branches: ["main"]
-  # Run daily to catch upstream updates
-  schedule:
-    - cron: "0 6 * * *"  # 6 AM UTC daily
-  # Allow manual trigger
   workflow_dispatch:
     inputs:
       force_rebuild:
@@ -85,7 +78,6 @@ jobs:
         run: bun run build:pages
         env:
           VITE_STATIC_DEPLOY: "true"
-          # "/" for custom domain (mac.ahmadjalil.com)
           VITE_BASE_PATH: "/"
 
       - name: Copy CNAME for custom domain
@@ -102,9 +94,7 @@ jobs:
           publish_dir: ./ryos/dist
           publish_branch: gh-pages
           commit_message: "Deploy: upstream ${{ env.UPSTREAM_SHA }} + customizations"
-          # Keep CNAME and other files
           keep_files: false
-          # Don't use force_orphan to preserve CNAME
           force_orphan: false
 
       - name: Summary

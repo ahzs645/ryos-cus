@@ -96,6 +96,10 @@ html.aqua[data-os-theme="macosx"] .mac-top-menubar {
   background-image: var(--menu-bar-pinstripe), var(--menu-bar-gradient) !important;
   border-bottom: 1px solid var(--menu-bar-border) !important;
   box-shadow: var(--menu-bar-shadow), var(--shadow-drop-medium) !important;
+  /* .menu-bar sets position: relative, but ryOS's top bar must stay
+     viewport-fixed — with a foreground app it mounts inside a content-width
+     wrapper and would otherwise shrink to the menus' width */
+  position: fixed !important;
 }
 /* .menu-bar's gloss ::before sits at z-index 1 — lift the bar's content
    above it (aqua.css does this via its ul, ryOS has plain flex children) */

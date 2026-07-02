@@ -157,6 +157,54 @@ html.aqua[data-os-theme="macosx"] .window:not(.is-foreground) {
   box-shadow: var(--aqua-window-shadow-inactive, var(--shadow-drop-soft));
 }
 
+/* ============================================================
+   Layer 3 — bare-element neutralization inside OS chrome
+   ============================================================ */
+/* aqua.css styles plain <button> as an Aqua push button (20px capsule,
+   min-width 50px, border, gradient, inset side shadows). ryOS renders menu
+   titles, the menubar status cluster, dock icons, and titlebar controls as
+   plain <button>s — inside chrome these must render as plain glyphs, not
+   push buttons. :where() keeps specificity low enough that the library's
+   own component classes (.menu-bar .menu-title etc.) still win; buttons
+   carrying explicit aqua-* classes keep the full library styling. */
+html.aqua[data-os-theme="macosx"]
+  :where(.mac-top-menubar, .mac-dock-surface, .traffic-lights, [data-titlebar-controls])
+  :where(button:not([class*="aqua-"])) {
+  font: inherit;
+  color: inherit;
+  padding: 0;
+  min-width: 0;
+  min-height: 0;
+  border: none;
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+}
+/* Bars size their buttons by stretching; the bare rule's fixed 20px would
+   otherwise leave menu titles floating as short chips */
+html.aqua[data-os-theme="macosx"]
+  :where(.mac-top-menubar, .mac-dock-surface)
+  :where(button:not([class*="aqua-"])) {
+  height: 100%;
+}
+/* App sidebars (.os-app-sidebar shared primitive; Finder uses its own
+   .os-sidebar): rows are <button>s too — strip the push-button capsule but
+   keep their own padding so rows don't cramp */
+html.aqua[data-os-theme="macosx"]
+  :where(.os-app-sidebar, .os-sidebar)
+  :where(button:not([class*="aqua-"])) {
+  font: inherit;
+  color: inherit;
+  height: auto;
+  min-width: 0;
+  min-height: 0;
+  border: none;
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+  justify-content: flex-start;
+}
+
 /* Native scrollbars: approximation of aqua.css's bespoke scrollbar markup so
    Radix/native scroll surfaces read as Aqua too (see RYOS_MAPPING.md §2.4) */
 html.aqua[data-os-theme="macosx"] ::-webkit-scrollbar {

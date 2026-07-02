@@ -52,9 +52,20 @@ jobs:
         working-directory: ryos
         run: bun install
 
+      - name: Build aqua.css skin assets
+        run: |
+          git clone --depth 1 https://github.com/ahzs645/aqua.css.git aqua-css
+          cd aqua-css
+          echo "aqua.css commit: $(git rev-parse --short HEAD)"
+          npm install --no-audit --no-fund
+          node build.js
+          echo "AQUA_CSS_DIST=$GITHUB_WORKSPACE/aqua-css/dist" >> $GITHUB_ENV
+
       - name: Apply customizations
         working-directory: ryos
         run: bun run scripts/customize/apply-customizations.ts
+        env:
+          AQUA_CSS_DIST: ${{ env.AQUA_CSS_DIST }}
 
       - name: Create .env file from template
         working-directory: ryos

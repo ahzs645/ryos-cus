@@ -47,6 +47,25 @@ if ! grep -q '"name": "soundboard"' "$TARGET_DIR/package.json" 2>/dev/null; then
     fi
 fi
 
+# Locate (and if needed build) aqua.css so the skin assets can be bundled.
+# Looks for a checkout next to this repo or next to the ryOS target.
+if [ -z "$AQUA_CSS_DIST" ]; then
+    for candidate in "$SCRIPT_DIR/../aqua.css" "$TARGET_DIR/../aqua.css"; do
+        if [ -f "$candidate/package.json" ]; then
+            if [ ! -f "$candidate/dist/aqua.scoped.css" ]; then
+                echo -e "${BLUE}Building aqua.css (dist missing)...${NC}"
+                (cd "$candidate" && npm install --no-audit --no-fund && node build.js)
+            fi
+            export AQUA_CSS_DIST="$(cd "$candidate/dist" && pwd)"
+            echo -e "   aqua.css dist: ${YELLOW}$AQUA_CSS_DIST${NC}"
+            break
+        fi
+    done
+    if [ -z "$AQUA_CSS_DIST" ]; then
+        echo -e "${YELLOW}Note: aqua.css repo not found next to this repo — the aqua.css skin will be installed without its stylesheet. Clone https://github.com/ahzs645/aqua.css alongside to enable it.${NC}"
+    fi
+fi
+
 # Copy the apply script to target and run it
 echo -e "${BLUE}Copying customization script...${NC}"
 mkdir -p "$TARGET_DIR/scripts/customize"

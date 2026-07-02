@@ -1,0 +1,149 @@
+/**
+ * aqua-bridge.css — maps ryOS's theme tokens onto aqua.css tokens.
+ *
+ * Loaded together with aqua.scoped.css by src/lib/aquaCssSkin.ts, only while
+ * the ryOS "macosx" theme is active (html.aqua[data-aqua-css-skin]).
+ *
+ * Layer 1: token bridge. ryOS paints nearly all of its Aqua chrome from
+ *   --os-* custom properties (src/styles/themes/tokens.css). Redefining them
+ *   from aqua.css's own tokens (defined on `.aqua` by the scoped build) makes
+ *   every token-driven surface — titlebars, menubar, pinstripes, selection,
+ *   inputs, fonts — render with aqua.css values automatically.
+ *
+ * Layer 2: forced overrides for the few surfaces ryOS paints with inline
+ *   styles or literal fallbacks that a plain stylesheet cannot reach.
+ *
+ * Reference: aqua.css docs/RYOS_MAPPING.md (component-by-component map).
+ * Accuracy-test setup: Classic material, Light appearance, System accent.
+ */
+
+/* ============================================================
+   Layer 1 — token bridge (ryOS --os-* ← aqua.css tokens)
+   ============================================================ */
+html.aqua[data-os-theme="macosx"] {
+  /* Typography — use aqua.css's real Lucida Grande @font-face stack */
+  --os-font-ui: var(--font-ui);
+
+  /* Window */
+  --os-color-window-bg: var(--window-bg);
+  --os-color-window-border: var(--window-border);
+  --os-color-window-border-inactive: var(--window-border-inactive);
+  --os-window-shadow: var(--aqua-window-shadow, var(--shadow-drop-strong));
+
+  /* Titlebar */
+  --os-color-titlebar-active-bg: var(--aqua-titlebar-bg);
+  --os-color-titlebar-inactive-bg: var(--aqua-titlebar-inactive-bg);
+  --os-color-titlebar-border: var(--window-titlebar-border);
+  --os-color-titlebar-border-inactive: var(--window-titlebar-border-inactive);
+  --os-color-titlebar-text: var(--window-titlebar-text);
+  --os-color-titlebar-text-inactive: var(--window-titlebar-text-inactive);
+
+  /* Pinstripes */
+  --os-pinstripe-titlebar: var(--aqua-pinstripe-titlebar);
+  --os-pinstripe-window: var(--pinstripe);
+  --os-pinstripe-menubar: var(--menu-bar-pinstripe);
+
+  /* Menu bar (MacTopMenuBar reads -surface with a literal fallback) */
+  --os-color-menubar-bg: var(--menu-bar-gradient);
+  --os-color-menubar-surface: var(--menu-bar-gradient);
+  --os-color-menubar-border: var(--menu-bar-border);
+  --os-color-menubar-text: var(--menu-bar-text);
+
+  /* Dock (MacDock reads these with literal fallbacks) */
+  --os-color-dock-surface: var(--dock-bg);
+  --os-color-dock-shadow: var(--dock-shadow);
+
+  /* Selection / focus / links */
+  --os-color-selection-bg: var(--selection-focused-solid);
+  --os-color-selection-text: var(--selection-focused-text);
+  --os-color-selection-text-shadow: var(--selection-focused-text-shadow);
+  --os-color-selection-glow: rgba(120, 171, 217, 0.8);
+  --os-color-link: var(--aqua-blue-dark, var(--aqua-blue));
+
+  /* Text */
+  --os-color-text-primary: var(--text-color);
+  --os-color-text-disabled: var(--text-disabled);
+
+  /* Panels / separators */
+  --os-color-panel-bg: var(--surface);
+  --os-color-separator: var(--table-border);
+
+  /* Inputs */
+  --os-color-input-bg: var(--input-bg);
+  --os-color-input-border: var(--select-border);
+  --os-color-input-focus-border: var(--input-focus-border);
+  --os-color-input-focus-ring: rgba(120, 171, 217, 0.5);
+
+  /* Toolbar texture: replace ryOS's brushed-metal photo with aqua.css's
+     procedural brushed metal so the two techniques can be compared */
+  --os-texture-toolbar-image: var(--brushed-metal);
+  --os-texture-toolbar-size: auto;
+  --os-texture-toolbar-repeat: repeat;
+}
+
+/* ============================================================
+   Layer 2 — forced overrides (inline-styled surfaces)
+   ============================================================ */
+
+/* Top menu bar: surface + pinstripe are set inline by MacTopMenuBar.tsx */
+html.aqua[data-os-theme="macosx"] .mac-top-menubar {
+  background: var(--menu-bar-gradient) !important;
+  background-image: var(--menu-bar-pinstripe), var(--menu-bar-gradient) !important;
+  border-bottom: 1px solid var(--menu-bar-border) !important;
+  box-shadow: var(--menu-bar-shadow) !important;
+}
+
+/* Select trigger: chrome is inline-styled by ui/select.tsx */
+html.aqua[data-os-theme="macosx"] .os-select-trigger-macos {
+  background: var(--select-gradient) !important;
+  border: 1px solid var(--select-border) !important;
+  box-shadow: var(--select-shadow) !important;
+}
+
+/* Tabs: aqua.css keys the active tab on `.aqua-tab--active`; ryOS's Radix
+   tabs use data-state — alias the state so both light up identically */
+html.aqua[data-os-theme="macosx"] .aqua-tab[data-state="active"] {
+  background: var(--tab-active-gradient);
+  box-shadow: var(--tab-active-inner-shadow);
+  text-shadow: var(--tab-active-text-shadow);
+}
+
+/* Windows: aqua.css `.aqua .window` wins over ryOS's single-class rules for
+   paint (border/radius/shadow) — desired. Its layout props (flex column,
+   overflow hidden) match ryOS's own window layout, so nothing to neutralize.
+   Map ryOS's foreground marker onto aqua.css's inactive look: */
+html.aqua[data-os-theme="macosx"] .window:not(.is-foreground) {
+  border-color: var(--window-border-inactive);
+  box-shadow: var(--aqua-window-shadow-inactive, var(--shadow-drop-soft));
+}
+
+/* Native scrollbars: approximation of aqua.css's bespoke scrollbar markup so
+   Radix/native scroll surfaces read as Aqua too (see RYOS_MAPPING.md §2.4) */
+html.aqua[data-os-theme="macosx"] ::-webkit-scrollbar {
+  width: 15px;
+  height: 15px;
+}
+html.aqua[data-os-theme="macosx"] ::-webkit-scrollbar-track {
+  background: linear-gradient(to right, #ebebeb, #f7f7f7);
+  border: 1px solid rgba(0, 0, 0, 0.15);
+}
+html.aqua[data-os-theme="macosx"] ::-webkit-scrollbar-thumb {
+  border-radius: 8px;
+  background:
+    linear-gradient(
+      to right,
+      rgba(255, 255, 255, 0.6),
+      rgba(255, 255, 255, 0) 50%
+    ),
+    linear-gradient(to bottom, #7db9e8, #2989d8 50%, #1e5799);
+  border: 1px solid rgba(0, 0, 0, 0.25);
+}
+html.aqua[data-os-theme="macosx"] ::-webkit-scrollbar-thumb:hover {
+  background:
+    linear-gradient(
+      to right,
+      rgba(255, 255, 255, 0.6),
+      rgba(255, 255, 255, 0) 50%
+    ),
+    linear-gradient(to bottom, #8fc4ee, #3993dc 50%, #2a63a3);
+}

@@ -962,6 +962,55 @@ import { TrafficLights } from "@/components/ui/TrafficLights";`
     ],
   });
 
+  // Attach aqua.css component classes to ryOS's chrome so the library's own
+  // component styles (not just bridged tokens) drive the rendering:
+  // menu bar (.menu-bar incl. gloss layer), menu titles (.menu-title),
+  // dropdown panels (.aqua-menu), dock shelf (.dock incl. reflection).
+  applyPatch({
+    file: "src/components/layout/menu-bar/MacTopMenuBar.tsx",
+    patches: [
+      {
+        search:
+          "className={`mac-top-menubar fixed top-0 left-0 right-0 flex items-center font-os-ui",
+        replace:
+          "className={`mac-top-menubar menu-bar fixed top-0 left-0 right-0 flex items-center font-os-ui",
+        description: "Tag menu bar with aqua.css .menu-bar",
+      },
+    ],
+  });
+  applyPatch({
+    file: "src/components/ui/menubar.tsx",
+    patches: [
+      {
+        // Tag every menubar trigger (app menubars hardcode their own class
+        // strings, so the shared MenubarTrigger component is the one place
+        // that covers them all)
+        search:
+          'isMacOSTheme && "rounded-none data-[state=open]:bg-[var(--os-color-selection-bg)] data-[state=open]:text-[var(--os-color-selection-text)] data-[state=closed]:!bg-transparent data-[state=closed]:!text-inherit",',
+        replace:
+          'isMacOSTheme && "menu-title rounded-none data-[state=open]:bg-[var(--os-color-selection-bg)] data-[state=open]:text-[var(--os-color-selection-text)] data-[state=closed]:!bg-transparent data-[state=closed]:!text-inherit",',
+        description: "Tag menubar triggers with aqua.css .menu-title",
+      },
+      {
+        search:
+          '"z-[10003] min-w-[12rem] overflow-hidden rounded-md border bg-popover p-1 text-popover-foreground shadow-md",',
+        replace:
+          '"aqua-menu z-[10003] min-w-[12rem] overflow-hidden rounded-md border bg-popover p-1 text-popover-foreground shadow-md",',
+        description: "Tag menubar dropdowns with aqua.css .aqua-menu",
+      },
+    ],
+  });
+  applyPatch({
+    file: "src/components/layout/dock/MacDock.tsx",
+    patches: [
+      {
+        search: 'className="mac-dock-surface inline-flex items-end"',
+        replace: 'className="mac-dock-surface dock inline-flex items-end"',
+        description: "Tag dock shelf with aqua.css .dock",
+      },
+    ],
+  });
+
   // aqua.css models classic Aqua (10.0–10.4): default the material to
   // "classic" so the skin isn't out-specified by the glass override sheet.
   // Users can still switch material in Control Panels.

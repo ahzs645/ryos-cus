@@ -43,11 +43,14 @@ html.aqua[data-os-theme="macosx"] {
   --os-pinstripe-window: var(--pinstripe);
   --os-pinstripe-menubar: var(--menu-bar-pinstripe);
 
-  /* Menu bar (MacTopMenuBar reads -surface with a literal fallback) */
+  /* Menu bar (MacTopMenuBar reads -surface with a literal fallback).
+     Height matches aqua.css's .menu-bar fixed 28px so ryOS layout offsets
+     (desktop area, window drag bounds) agree with the component. */
   --os-color-menubar-bg: var(--menu-bar-gradient);
   --os-color-menubar-surface: var(--menu-bar-gradient);
   --os-color-menubar-border: var(--menu-bar-border);
   --os-color-menubar-text: var(--menu-bar-text);
+  --os-metrics-menubar-height: 28px;
 
   /* Dock (MacDock reads these with literal fallbacks) */
   --os-color-dock-surface: var(--dock-bg);
@@ -85,12 +88,49 @@ html.aqua[data-os-theme="macosx"] {
    Layer 2 — forced overrides (inline-styled surfaces)
    ============================================================ */
 
-/* Top menu bar: surface + pinstripe are set inline by MacTopMenuBar.tsx */
+/* Top menu bar: the apply script adds aqua.css's .menu-bar class (gloss
+   ::before layer, metrics, borders come from the component), but ryOS sets
+   the surface inline in MacTopMenuBar.tsx — force the component's layers */
 html.aqua[data-os-theme="macosx"] .mac-top-menubar {
   background: var(--menu-bar-gradient) !important;
   background-image: var(--menu-bar-pinstripe), var(--menu-bar-gradient) !important;
   border-bottom: 1px solid var(--menu-bar-border) !important;
-  box-shadow: var(--menu-bar-shadow) !important;
+  box-shadow: var(--menu-bar-shadow), var(--shadow-drop-medium) !important;
+}
+/* .menu-bar's gloss ::before sits at z-index 1 — lift the bar's content
+   above it (aqua.css does this via its ul, ryOS has plain flex children) */
+html.aqua[data-os-theme="macosx"] .mac-top-menubar > * {
+  position: relative;
+  z-index: 2;
+}
+/* Open menu title = classic Aqua selection highlight. ryOS triggers carry
+   .menu-title (added by the apply script) but signal state via Radix
+   data-state instead of :hover/.active */
+html.aqua[data-os-theme="macosx"] .menu-title[data-state="open"] {
+  background: var(--menu-title-hover-bg, var(--selection-focused-solid)) !important;
+  color: var(--selection-focused-text) !important;
+}
+
+/* Menubar dropdown panels: ryOS inline-styles them (pinstripe bg, 0.92
+   opacity, square corners) — force aqua.css's .menu-dropdown look. The
+   .aqua-menu class is added to MenubarContent by the apply script. */
+html.aqua[data-os-theme="macosx"] .aqua-menu {
+  background: var(--menu-dropdown-gradient) !important;
+  border: 1px solid var(--menu-dropdown-border) !important;
+  border-radius: 5px !important;
+  box-shadow: var(--menu-dropdown-shadow) !important;
+  opacity: 1 !important;
+}
+
+/* Dock shelf: the apply script adds aqua.css's .dock class (reflection
+   ::after + backdrop blur come from the component); force the inline-styled
+   surface paint. Height/padding stay ryOS-managed so magnification works. */
+html.aqua[data-os-theme="macosx"] .mac-dock-surface {
+  background-color: var(--dock-bg) !important;
+  background-image: var(--dock-pinstripe) !important;
+  border: var(--dock-border) !important;
+  border-radius: var(--dock-border-radius) !important;
+  box-shadow: var(--dock-shadow) !important;
 }
 
 /* Select trigger: chrome is inline-styled by ui/select.tsx */

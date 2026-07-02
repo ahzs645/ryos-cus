@@ -204,16 +204,23 @@ async function main() {
 
   // Step 3: Patch package.json
   logStep("Step 3: Patching package.json");
-  applyPatch({
-    file: "package.json",
-    patches: [
-      {
-        search: '"build:tauri": "bun run scripts/build-tauri.ts",',
-        replace: '"build:tauri": "bun run scripts/build-tauri.ts",\n    "build:pages": "tsc -b && VITE_STATIC_DEPLOY=true vite build",',
-        description: "Add build:pages script",
-      },
-    ],
-  });
+  {
+    const pkgPath = path.join(ROOT, "package.json");
+    let pkg = fs.readFileSync(pkgPath, "utf-8");
+    if (pkg.includes('"build:pages"')) {
+      logSuccess("package.json: build:pages script (already applied)");
+    } else if (pkg.includes('"build": "tsc -b && vite build",')) {
+      // Anchor on the stable "build" script (upstream removed "build:tauri")
+      pkg = pkg.replace(
+        '"build": "tsc -b && vite build",',
+        '"build": "tsc -b && vite build",\n    "build:pages": "tsc -b && VITE_STATIC_DEPLOY=true vite build",'
+      );
+      fs.writeFileSync(pkgPath, pkg);
+      logSuccess("package.json: Added build:pages script");
+    } else {
+      logError("package.json: could not find the \"build\" script to anchor build:pages");
+    }
+  }
 
   // Step 4: Patch vite.config.ts for static deployment
   logStep("Step 4: Patching vite.config.ts");
@@ -286,19 +293,31 @@ import { useOSName } from "@/stores/useCvStore";`
       logSuccess("Added config imports to AboutFinderDialog");
     }
 
-    // Add osName hook usage after isXpTheme if not present
-    if (!content.includes("useOSName(currentTheme)") && content.includes("const isXpTheme")) {
-      content = content.replace(
-        /const isXpTheme = currentTheme === "xp" \|\| currentTheme === "win98";/,
-        `const isXpTheme = currentTheme === "xp" || currentTheme === "win98";
+    // Add osName hook usage if not present. Two known upstream layouts:
+    // older builds computed `isXpTheme` locally; current upstream reads
+    // `currentTheme` from useThemeFlags().
+    const osNameHook = `
 
   // Get OS name from CV store (hook must be called unconditionally)
   const cvOSName = useOSName(currentTheme);
   const useCVBranding = getCVConfig().useCVForBranding;
-  const osName = useCVBranding ? cvOSName : getFullOSName(currentTheme);`
-      );
-      modified = true;
-      logSuccess("Added osName hook to AboutFinderDialog");
+  const osName = useCVBranding ? cvOSName : getFullOSName(currentTheme);`;
+    if (!content.includes("useOSName(currentTheme)")) {
+      const isXpAnchor =
+        /const isXpTheme = currentTheme === "xp" \|\| currentTheme === "win98";/;
+      const themeFlagsAnchor =
+        /const \{[^}]*currentTheme[^}]*\} = useThemeFlags\(\);/;
+      if (isXpAnchor.test(content)) {
+        content = content.replace(isXpAnchor, (m) => m + osNameHook);
+        modified = true;
+        logSuccess("Added osName hook to AboutFinderDialog");
+      } else if (themeFlagsAnchor.test(content)) {
+        content = content.replace(themeFlagsAnchor, (m) => m + osNameHook);
+        modified = true;
+        logSuccess("Added osName hook to AboutFinderDialog (useThemeFlags layout)");
+      } else {
+        logWarning("Could not find anchor for osName hook in AboutFinderDialog");
+      }
     }
 
     // Replace hardcoded ryOS with theme suffixes
@@ -680,8 +699,16 @@ import { getOSConfig } from "@/lib/config";`
     let content = fs.readFileSync(appTsxPath, "utf-8");
     let modified = false;
 
+    // Only add the config import when something below will actually use it —
+    // current upstream removed the download toasts, and an unused import
+    // fails the tsc -b build (TS6133).
+    const hasConfigTargets =
+      content.includes('toast(`ryOS ${result.version} for Mac is available`') ||
+      content.includes('toast("ryOS is available as a Mac app"') ||
+      /https:\/\/github\.com\/ryokun6\/ryos\/releases\/download\//.test(content);
+
     // Add config import if not present
-    if (!content.includes('from "@/lib/config"')) {
+    if (!content.includes('from "@/lib/config"') && hasConfigTargets) {
       // Try the actual import path used in App.tsx
       if (content.includes('import { Toaster } from "./components/ui/sonner"')) {
         content = content.replace(
@@ -892,6 +919,137 @@ import { TrafficLights } from "@/components/ui/TrafficLights";`
     if (modified) {
       fs.writeFileSync(appManagerPath, content);
     }
+  }
+
+  // Step 16: Install aqua.css skin (component-mapping testbed)
+  logStep("Step 16: Installing aqua.css skin");
+
+  copyTemplate("aqua-css/aquaCssSkin.ts", "src/lib/aquaCssSkin.ts");
+  copyTemplate("aqua-css/aqua-bridge.css", "public/aqua-css/aqua-bridge.css");
+  copyTemplate(
+    "aqua-css/AquaTrafficLightButton.tsx",
+    "src/components/shared/AquaTrafficLightButton.tsx"
+  );
+
+  ensureImport(
+    "src/main.tsx",
+    'import "./lib/aquaCssSkin";',
+    /import "\.\/index\.css";/
+  );
+
+  // Swap the titlebar's traffic lights for the aqua.css-styled adapter
+  // (current upstream layout; see docs/RYOS_MAPPING.md — TEMPLATE mechanism)
+  applyPatch({
+    file: "src/components/layout/window-frame/WindowFrameTitleBar.tsx",
+    patches: [
+      {
+        search:
+          'import { TrafficLightButton } from "@/components/shared/TrafficLightButton";',
+        replace:
+          'import { TrafficLightButton } from "@/components/shared/AquaTrafficLightButton";',
+        description: "Use aqua.css traffic lights",
+      },
+      {
+        // aqua.css reveals the ×/−/+ glyphs via a .traffic-lights:hover
+        // container rule — tag the existing control group with that class.
+        // --always-colored matches real Aqua: foreground windows show colored
+        // orbs at rest (inactive state comes from .aqua-inactive per button).
+        search: 'className="group/traffic flex items-center gap-2 ml-1.5 relative"',
+        replace:
+          'className="group/traffic traffic-lights traffic-lights--always-colored flex items-center gap-2 ml-1.5 relative"',
+        description: "Tag titlebar control group as .traffic-lights",
+      },
+    ],
+  });
+
+  // Attach aqua.css component classes to ryOS's chrome so the library's own
+  // component styles (not just bridged tokens) drive the rendering:
+  // menu bar (.menu-bar incl. gloss layer), menu titles (.menu-title),
+  // dropdown panels (.aqua-menu), dock shelf (.dock incl. reflection).
+  applyPatch({
+    file: "src/components/layout/menu-bar/MacTopMenuBar.tsx",
+    patches: [
+      {
+        search:
+          "className={`mac-top-menubar fixed top-0 left-0 right-0 flex items-center font-os-ui",
+        replace:
+          "className={`mac-top-menubar menu-bar fixed top-0 left-0 right-0 flex items-center font-os-ui",
+        description: "Tag menu bar with aqua.css .menu-bar",
+      },
+    ],
+  });
+  applyPatch({
+    file: "src/components/ui/menubar.tsx",
+    patches: [
+      {
+        // Tag every menubar trigger (app menubars hardcode their own class
+        // strings, so the shared MenubarTrigger component is the one place
+        // that covers them all)
+        search:
+          'isMacOSTheme && "rounded-none data-[state=open]:bg-[var(--os-color-selection-bg)] data-[state=open]:text-[var(--os-color-selection-text)] data-[state=closed]:!bg-transparent data-[state=closed]:!text-inherit",',
+        replace:
+          'isMacOSTheme && "menu-title rounded-none data-[state=open]:bg-[var(--os-color-selection-bg)] data-[state=open]:text-[var(--os-color-selection-text)] data-[state=closed]:!bg-transparent data-[state=closed]:!text-inherit",',
+        description: "Tag menubar triggers with aqua.css .menu-title",
+      },
+      {
+        search:
+          '"z-[10003] min-w-[12rem] overflow-hidden rounded-md border bg-popover p-1 text-popover-foreground shadow-md",',
+        replace:
+          '"aqua-menu z-[10003] min-w-[12rem] overflow-hidden rounded-md border bg-popover p-1 text-popover-foreground shadow-md",',
+        description: "Tag menubar dropdowns with aqua.css .aqua-menu",
+      },
+    ],
+  });
+  applyPatch({
+    file: "src/components/layout/dock/MacDock.tsx",
+    patches: [
+      {
+        search: 'className="mac-dock-surface inline-flex items-end"',
+        replace: 'className="mac-dock-surface dock inline-flex items-end"',
+        description: "Tag dock shelf with aqua.css .dock",
+      },
+    ],
+  });
+
+  // aqua.css models classic Aqua (10.0–10.4): default the material to
+  // "classic" so the skin isn't out-specified by the glass override sheet.
+  // Users can still switch material in Control Panels.
+  applyPatch({
+    file: "src/themes/index.ts",
+    patches: [
+      {
+        search: 'export const DEFAULT_AQUA_MATERIAL: AquaMaterial = "glass";',
+        replace: 'export const DEFAULT_AQUA_MATERIAL: AquaMaterial = "classic";',
+        description: "Default Aqua material to classic for the aqua.css skin",
+      },
+    ],
+  });
+
+  // Bundle the built aqua.css library if a dist directory was provided
+  // (set AQUA_CSS_DIST; CI builds it from ahzs645/aqua.css, apply.sh builds
+  // it from a sibling checkout). Fonts/icons must sit next to the CSS file
+  // because the stylesheet references them with relative URLs.
+  const aquaDist = process.env.AQUA_CSS_DIST;
+  if (aquaDist && fs.existsSync(path.join(aquaDist, "aqua.scoped.css"))) {
+    const destDir = path.join(ROOT, "public/aqua-css");
+    fs.mkdirSync(destDir, { recursive: true });
+    for (const entry of fs.readdirSync(aquaDist)) {
+      const keep =
+        entry === "aqua.scoped.css" ||
+        entry === "aqua.scoped.css.map" ||
+        entry === "progress.png" ||
+        entry === "icon" ||
+        /\.(woff2?|ttf|otf)$/i.test(entry);
+      if (!keep) continue;
+      fs.cpSync(path.join(aquaDist, entry), path.join(destDir, entry), {
+        recursive: true,
+      });
+    }
+    logSuccess(`Bundled aqua.scoped.css + assets from ${aquaDist}`);
+  } else {
+    logWarning(
+      "AQUA_CSS_DIST not set (or aqua.scoped.css missing) — skin installed but the aqua.css stylesheet is not bundled; it will 404 until public/aqua-css/aqua.scoped.css exists"
+    );
   }
 
   // Done!

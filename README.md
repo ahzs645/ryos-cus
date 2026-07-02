@@ -109,6 +109,41 @@ Edit `templates/persona.md` with your personality.
 ### Change Profile Data
 Edit `templates/CV.yaml` with your info (name, links, experience).
 
+## 🫧 aqua.css Skin (component-mapping testbed)
+
+This overlay can layer [aqua.css](https://github.com/ahzs645/aqua.css) — our
+Mac OS X 10.0–10.4 Aqua CSS library — on top of ryOS's built-in **Mac OS X**
+theme, so ryOS doubles as a live accuracy testbed for the library.
+
+**How it works**
+
+1. CI (or `apply.sh`, if `aqua.css` is cloned next to this repo) builds
+   aqua.css and bundles `aqua.scoped.css` + fonts/icons into
+   `public/aqua-css/`.
+2. `templates/aqua-css/aquaCssSkin.ts` (installed as `src/lib/aquaCssSkin.ts`)
+   watches the theme store; while the `macosx` theme is active it adds
+   `class="aqua"` to `<html>` and injects two stylesheets:
+   - **`aqua.scoped.css`** — the library with every rule prefixed under
+     `.aqua`, so shared class names (`.window`, `.aqua-button`, `.aqua-tab`,
+     `.traffic-lights`…) get aqua.css's rendering without touching other
+     themes.
+   - **`aqua-bridge.css`** (`templates/aqua-css/aqua-bridge.css`) — remaps
+     ryOS's `--os-*` design tokens (titlebar gradients, pinstripes, menu bar,
+     dock, selection, inputs, fonts) to aqua.css's tokens, plus targeted
+     overrides for inline-styled surfaces.
+3. Switching to System 7 / XP / 98 removes the class and both stylesheets.
+
+**Component mapping:** the full ryOS-part → aqua.css-component map (including
+what's reachable by tokens vs. classes vs. template swaps, and known gaps)
+lives in [`docs/RYOS_MAPPING.md` in the aqua.css repo](https://github.com/ahzs645/aqua.css/blob/main/docs/RYOS_MAPPING.md).
+
+**Accuracy-testing setup:** in ryOS pick theme **Mac OS X**, material
+**Classic**, appearance **Light**, accent **System** (aqua.css models classic
+light Aqua; glass/dark/accents are ryOS extensions that fight the skin).
+
+**Toggle:** set `VITE_AQUA_CSS_SKIN="false"` to build with the skin disabled
+and compare ryOS's native Aqua rendering against the aqua.css one.
+
 ## How the Script Works
 
 The `apply-customizations.ts` script:
